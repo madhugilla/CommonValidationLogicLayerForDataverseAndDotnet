@@ -34,20 +34,39 @@ Client -> API Controller -> (Model Binding) -> Request DTO -> Command Mapping ->
 
 ### Sequence Diagram
 
-```text
-+---------+      +-----------------+      +----------------+      +-------------------+
-| Client  | ---> | OrdersController| ---> | OrderService   | ---> | Dataverse Adapter  |
-+---------+      +-----------------+      +----------------+      +-------------------+
-       HTTP POST /api/orders                |                        |
-                                            | CreateOrderAsync       |
-                                            |  - Map DTO -> Command  |
-                                            |  - Call validator      |
-                                            |  - Throw on failure    |
-                                            v                        |
-                                      Shared Validator               |
-                                            | (IOrderRulesData impl) |
-                                            v                        v
-                                       (If valid)  Dataverse create (plugin will validate again)
+```mermaid
+sequenceDiagram
+    autonumber
+    participant C as Client
+    participant AC as API Controller
+    participant S as OrderService
+    participant V as CreateOrderValidator
+    participant D as Dataverse
+    participant P as Plugin (PreValidation)
+
+    C->>AC: POST /api/orders (JSON)
+    AC->>S: CreateOrderAsync(command)
+    S->>V: ValidateAsync(command)
+    V-->>S: ValidationResult (valid?)
+    alt Invalid
+        V-->>AC: Errors
+        AC-->>C: 400 ValidationProblemDetails
+    else Valid
+        S->>D: Create order
+        D->>P: Invoke Plugin Pipeline
+        P->>V: Re-run validation (authoritative)
+        V-->>P: Result
+        alt Plugin invalid
+            P-->>D: Throw InvalidPluginExecutionException
+            D-->>S: Abort transaction
+            S-->>AC: Error propagated
+            AC-->>C: 400/Failure
+        else Plugin valid
+            D-->>S: OrderId
+            S-->>AC: OrderResponse
+            AC-->>C: 201 Created
+        end
+    end
 ```
 
 Controller excerpt (simplified):
@@ -98,8 +117,27 @@ if(!result.IsValid)
 
 Where it sits in the pipeline:
 
-```text
-User / Integration -> Dataverse Platform -> (PreValidation Plugin) -> Transaction continues if valid -> Core Operation (DB write) -> PostOperation plugins
+```mermaid
+sequenceDiagram
+    autonumber
+    participant U as User / Client
+    participant DP as Dataverse Platform
+    participant PV as PreValidation Plugin
+    participant CO as Core Operation
+    participant PO as PostOperation Plugins
+    U->>DP: Create Request
+    DP->>PV: Invoke PreValidation stage
+    PV->>PV: Map & Validate (CreateOrderValidator)
+    alt Invalid
+        PV-->>DP: Throw InvalidPluginExecutionException
+        DP-->>U: Error (validation details)
+    else Valid
+        PV-->>DP: Continue
+        DP->>CO: Perform DB write
+        CO-->>PO: Invoke PostOperation
+        PO-->>DP: Optional post-processing
+        DP-->>U: Success (OrderId)
+    end
 ```
 
 Plugin role:
