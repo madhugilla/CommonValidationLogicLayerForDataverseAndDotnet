@@ -61,23 +61,44 @@ dotnet build
 
 ### 2. Configure Dataverse Connection
 
-Update `src/Api.Orders/appsettings.json` with your Dataverse connection string:
+The repository uses an environment-variable placeholder in `appsettings.json`:
 
 ```json
 {
   "ConnectionStrings": {
-    "Dataverse": "AuthType=OAuth;Username=your-username@contoso.com;Password=your-password;Url=https://your-org.crm.dynamics.com;AppId=51f81489-12ee-4a9e-aaae-a2591f45987d;RedirectUri=app://58145B91-0C36-4500-8554-080854F2AC97;LoginPrompt=Auto"
+    "Dataverse": "${DATAVERSE_CONNECTION_STRING}"
   }
 }
 ```
 
-**For production**, use more secure authentication methods like Client Secrets or Certificates.
+Create a user secret or environment variable:
+
+Windows (PowerShell):
+
+```powershell
+$env:DATAVERSE_CONNECTION_STRING = "AuthType=OAuth;..."
+```
+
+Linux/macOS:
+
+```bash
+export DATAVERSE_CONNECTION_STRING="AuthType=OAuth;..."
+```
+
+User Secrets (in `src/Api.Orders`):
+
+```bash
+dotnet user-secrets set "ConnectionStrings:Dataverse" "AuthType=OAuth;..." --project src/Api.Orders/Api.Orders.csproj
+```
+
+Prefer secure flows (Client Secret or Certificate) in production; avoid username/password.
 
 ### 3. Create Dataverse Schema
 
 Create the following entities in your Dataverse environment:
 
 **Order Entity (`new_order`)**:
+
 - `new_customerid` (Customer lookup to Account)
 - `new_orderdate` (Date)
 - `new_ordernumber` (Text)
@@ -110,7 +131,7 @@ The API will be available at `https://localhost:7000` with Swagger UI at the roo
 
 ### Unit Tests
 
-Run the shared validation tests:
+Run the shared validation tests (currently 38 passing tests covering boundaries, error paths, and success cases):
 
 ```bash
 cd tests/Shared.Domain.Tests
@@ -145,6 +166,7 @@ curl -X POST https://localhost:7000/api/orders/validate \
 ### Plugin Testing
 
 Create an order through:
+
 - Dataverse forms
 - Power Apps
 - Power Automate
@@ -269,6 +291,15 @@ public async Task<IActionResult> CreateOrder(CreateOrderRequest request)
 - **Integration test both paths** (plugin and API) against actual Dataverse
 - **Performance test** with realistic data volumes
 
+## 🧬 Multi-Targeting Rationale
+
+`Shared.Domain` targets both `net8.0` and `netstandard2.0` so it can be consumed by:
+
+- Modern .NET 8 API (leveraging latest runtime features)
+- Legacy `net472` plugin via `netstandard2.0` surface (compatible with classic Dataverse plugin host)
+
+Records are preserved by adding an `IsExternalInit` polyfill for the `netstandard2.0` target, avoiding refactors to classes while keeping modern C# expressiveness.
+
 ## 📚 Key Files Reference
 
 | File | Purpose |
@@ -279,6 +310,54 @@ public async Task<IActionResult> CreateOrder(CreateOrderRequest request)
 | `Api.Orders/Controllers/OrdersController.cs` | **API controller** - validates before sending to Dataverse |
 | `Plugins.Dataverse/Adapters/DataverseOrderRulesData.cs` | **Plugin data adapter** - implements IOrderRulesData using IOrganizationService |
 | `Api.Orders/Adapters/DataverseOrderRulesDataForApp.cs` | **API data adapter** - implements IOrderRulesData using ServiceClient |
+| `Tests/Shared.Domain.Tests/CreateOrderValidatorAdditionalTests.cs` | **Extended test coverage** for boundaries & edge cases |
+
+## 🔒 Security & Secrets
+
+Do not commit real credentials. Connection string is externalized. Recommended improvements:
+
+- Use Azure Key Vault or environment variables in hosting environment
+- Store secrets only in CI secret store (GitHub Actions Secrets)
+- Enforce HTTPS and strict TLS settings
+- Add static code analysis (CodeQL)
+
+## 🤖 CI/CD (Suggested)
+
+Add a GitHub Actions workflow `.github/workflows/ci.yml`:
+
+- Restore -> Build (Release) -> Test -> (Optional) Publish test & coverage results
+- Fail build on test failures
+
+Optional steps:
+
+- Cache NuGet (`actions/cache`)
+- Upload coverage to Codecov
+
+## 🗺️ Roadmap (Ideas)
+
+- Implement real order line entity persistence & retrieval
+- Add credit limit validation using customer financials
+- Introduce caching layer for product/customer lookups
+- Provide integration test project hitting a Dataverse sandbox (flagged to skip in CI without env vars)
+- Add OpenAPI schema filtering for validation error codes
+- Provide sample Power Automate flow invoking API
+
+## ⚠️ Troubleshooting Additions
+
+If environment variable not picked up:
+
+- Ensure terminal session set it before running `dotnet run`
+- On Windows, consider using System Environment Variables if launching via IDE
+
+If plugin cannot load assembly:
+
+- Confirm target framework remains `net472`
+- Ensure no accidental reference to `net8.0`-only APIs in plugin project
+
+If validation differs between API and plugin:
+
+- Check both adapters (`DataverseOrderRulesData` vs `DataverseOrderRulesDataForApp`) return matching data for same IDs
+
 
 ## 🤝 Contributing
 
@@ -302,7 +381,8 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 **Validation not working**: Ensure both adapters implement IOrderRulesData correctly and return consistent results.
 
-**Performance issues**: 
+**Performance issues**:
+
 - Use column sets to limit data retrieval
 - Implement caching for reference data
 - Avoid N+1 query patterns
