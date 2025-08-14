@@ -1,0 +1,52 @@
+## Build artifacts
+bin/
+obj/
+**/bin/
+**/obj/
+
+## User-specific
+*.user
+*.suo
+*.userprefs
+.vs/
+
+## Logs
+logs/
+*.log
+
+## OS
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+*.DS_Store
+
+## Rider / JetBrains
+.idea/
+
+## Dotnet
+*.pidb
+*.svclog
+TestResult*/
+*.coverage*
+*.lcov
+
+## Secrets / configuration overrides
+appsettings.Development.json
+appsettings.Local.json
+*.Secret.json
+secrets.json
+
+## Azure / tooling
+.azure/
+
+## Coverage
+coverage/
+coverage-report/
+
+## Packages
+*.nupkg
+packages/
+
+## Others
+~$*
+*.bak
