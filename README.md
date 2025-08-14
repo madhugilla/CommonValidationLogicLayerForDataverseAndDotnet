@@ -321,19 +321,25 @@ Do not commit real credentials. Connection string is externalized. Recommended i
 - Enforce HTTPS and strict TLS settings
 - Add static code analysis (CodeQL)
 
-## 🤖 CI/CD (Suggested)
+## 🤖 CI/CD (Implemented)
 
-Workflow defined in `.github/workflows/ci.yml` executes on pushes and PRs to `main` or `master`:
+Workflow `.github/workflows/ci.yml` runs on pushes and PRs to `main` / `master`:
 
 - Restore -> Build (Release) -> Test (with coverage collection)
 - Publishes test results & coverage (Cobertura + lcov) as artifacts
-- Separate job lints `README.md` using markdown-lint
+- Optional Codecov upload step (add `CODECOV_TOKEN` secret to enable)
+- Separate job lints `README.md`
 
-You can extend by:
+Additional automation:
 
-- Adding Codecov upload (needs CODECOV_TOKEN secret)
-- Enabling dependabot for NuGet & GitHub Actions
-- Adding security scanning (CodeQL workflow)
+- Code scanning via CodeQL (`.github/workflows/codeql.yml`)
+- Dependency updates via Dependabot (`.github/dependabot.yml`) for NuGet & GitHub Actions (daily)
+
+Recommended next enhancements:
+
+- Enforce status checks (tests, CodeQL) before merge
+- Add branch protection & required reviews
+- Gate plugin deployment with a manual approval job
 
 ## 🗺️ Roadmap (Ideas)
 

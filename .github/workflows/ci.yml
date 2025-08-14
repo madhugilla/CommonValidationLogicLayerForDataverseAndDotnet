@@ -58,6 +58,14 @@ jobs:
           name: test-results
           path: TestResults
 
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: coverage/lcov.info
+          fail_ci_if_error: false
+          verbose: false
+
   lint-readme:
     runs-on: ubuntu-latest
     steps:
