@@ -323,15 +323,17 @@ Do not commit real credentials. Connection string is externalized. Recommended i
 
 ## 🤖 CI/CD (Suggested)
 
-Add a GitHub Actions workflow `.github/workflows/ci.yml`:
+Workflow defined in `.github/workflows/ci.yml` executes on pushes and PRs to `main` or `master`:
 
-- Restore -> Build (Release) -> Test -> (Optional) Publish test & coverage results
-- Fail build on test failures
+- Restore -> Build (Release) -> Test (with coverage collection)
+- Publishes test results & coverage (Cobertura + lcov) as artifacts
+- Separate job lints `README.md` using markdown-lint
 
-Optional steps:
+You can extend by:
 
-- Cache NuGet (`actions/cache`)
-- Upload coverage to Codecov
+- Adding Codecov upload (needs CODECOV_TOKEN secret)
+- Enabling dependabot for NuGet & GitHub Actions
+- Adding security scanning (CodeQL workflow)
 
 ## 🗺️ Roadmap (Ideas)
 
